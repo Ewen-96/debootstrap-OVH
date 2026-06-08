@@ -17,7 +17,7 @@ VG_NAME="vg_system"
 TARGET_MOUNT="/mnt/ubuntu_install"
 UBUNTU_RELEASE="noble"
 
-
+SSH_PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsMgUSJ7k/8gSZ2tbUUGfZjF/AtBAp/5EE/vBoZhS2y ewen@inspiron"
 #Partitionnement
 
 prepare_disk_lvm() {
@@ -87,7 +87,7 @@ run_debootstrap() {
 
 }
 
-#Pr�pare le nouveau systèmea �tre lancer
+#Prépare le nouveau système�rtre lancer
 prepare_chroot() {
 
         #Copie le resovle.conf de rescue vers le noyaux système 
@@ -116,10 +116,85 @@ EOF
 
 }
 
+configure_chroot(){
+        
+        #Définit le nom de la machine depuis le rescue
+        echo "$TARGET_HOSTNAME" > "$TARGET_MOUNT/etc/hostname"     
+       
+        #Définit le fuseau horaire sur Paris
+        chroot "$TARGET_MOUNT" ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+        
+        #Envoi le mots de passe depuis le rescue vers l'interieure 
+        echo "root:$ROOT_PASSWORD" | chroot "$TARGET_MOUNT" chpasswd
+
+        #Installation des paquets
+        #env DEBIAN_FRONTEND=noninteractive empêche les menus de bloquer le script
+        chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-generic grub-efi-amd64 openssh-server sudo vim netplan.io
+
+
+
+        #Création du dossier netplan pour la configuration éseau 
+        mkdir -p "$TARGET_MOUNT/etc/netplan"
+
+
+
+        #Création et configuration du fichier netcfg.yaml
+
+        #renderer:networkd, Précise d'utiliser systemd-networkd comme moteur de gestion deréseau
+        #match: name: e*, Dis au systeme de choisir n'imorte quelle carte réseau qui commence par un e (eth0, enp0s3, ens3... ) 
+        #dhcp4: true, Demande automatiquement une addresse IP auprès de la box ou du routeur 
+        cat <<EOF > "$TARGET_MOUNT/etc/netplan/01-netcfg.yaml"
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    main_nic:
+      match:
+        name: e*
+      dhcp4: true
+EOF
+
+
+        
+        #Créatin du dossier .ssh
+        mkdir -p "$TARGET_MOUNT/root/.ssh"
+        
+        #Rajout de la clépublique dans le fichier authorized_keys
+        echo "$SSH_PUBLIC_KEY" > "$TARGET_MOUNT/root/.ssh/authorized_keys"
+        
+        #Attribution des droits au fichier/dossier 
+        chmod 700 "$TARGET_MOUNT/root/.ssh"
+        chmod 600 "$TARGET_MOUNT/root/.ssh/authorized_keys"
+
+
+        #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TEMPORAIRE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #Autorise le compte root a se connecer en ssh avec son propre mots de passe 
+        sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$TARGET_MOUNT/etc/ssh/sshd_config"
+
+
+        #Installation de GRUB
+        chroot "$TARGET_MOUNT" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu
+        chroot "$TARGET_MOUNT" update-grub
+
+        
+
+
+        #Nettoyage
+        umount -R "$TARGET_MOUNT"
+        swapoff -a
+
+
+}       
+
+
+
 
 #Installation
 prepare_disk_lvm
 
 run_debootstrap
 
-prepare_chroot
+repare_chroot
+
+configure_chroot
