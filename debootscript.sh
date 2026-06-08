@@ -130,7 +130,7 @@ configure_chroot(){
         #Installation des paquets
         #env DEBIAN_FRONTEND=noninteractive empêche les menus de bloquer le script
         chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get update -qq
-        chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-generic grub-efi-amd64 openssh-server sudo vim netplan.io
+        chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-image-generic grub-efi-amd64 openssh-server sudo vim netplan.io lvm2
 
 
 
@@ -195,6 +195,6 @@ prepare_disk_lvm
 
 run_debootstrap
 
-repare_chroot
+prepare_chroot
 
 configure_chroot
