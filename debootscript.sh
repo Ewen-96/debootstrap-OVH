@@ -152,9 +152,6 @@ EOF
         chmod 700 "$TARGET_MOUNT/root/.ssh"
         chmod 600 "$TARGET_MOUNT/root/.ssh/authorized_keys"
 
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!TEMPORAIRE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # Autorise le compte root a se connecter en ssh avec son propre mot de passe
-        sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$TARGET_MOUNT/etc/ssh/sshd_config"
 
         # Installation de GRUB
         chroot "$TARGET_MOUNT" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu
