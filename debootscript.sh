@@ -18,15 +18,17 @@ TARGET_MOUNT="/mnt/ubuntu_install"
 UBUNTU_RELEASE="noble"
 
 SSH_PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsMgUSJ7k/8gSZ2tbUUGfZjF/AtBAp/5EE/vBoZhS2y ewen@inspiron"
-#Partitionnement
 
+
+
+#Partitionnement
 prepare_disk_lvm() {
 
 	# Nettoyage
 	wipefs -a "$TARGET_DISK"
 	sgdisk --zap-all "$TARGET_DISK"
 
-	#Crére une partition EFI de 512MB sur $TARGET_DISK:
+	#Cré une partition EFI de 512MB sur $TARGET_DISK:
 	sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$TARGET_DISK"
 	#Crér une seconde partition sur $TARGET_DISK avec toute la place restante
 	sgdisk -n 2:0:0 -t 2:8e00 -c 2:"LVM" "$TARGET_DISK"
@@ -42,10 +44,10 @@ prepare_disk_lvm() {
 	#Installer le  peripherique de stockage pour qu'il soit reconnu et utilisé par LVM
 	pvcreate -y "$PART_LVM"
 
-	#crée un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour être decoupe en plusieurs volumes virtuels
+	#crée un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour être decoé en plusieurs volumes virtuels
 	vgcreate -y "$VG_NAME" "$PART_LVM"
 
-	#Decoupe le stockage nouvellement crée en deux parties, une partie de 50GB pour installer le root et une autre partie de 8G pour installer le swap
+	#Découpe le stockage nouvellement cré en deux parties, une partie de 50GB pour installer le root et une autre partie de 8G pour installer le swap
 	lvcreate -y -L 50G -n root "$VG_NAME"
 	lvcreate -y -L 8G -n swap "$VG_NAME"
 
@@ -58,18 +60,18 @@ prepare_disk_lvm() {
 
 
 
-#Télechargement
+#Tééchargement
 run_debootstrap() {
 
 	#Installation de debootstrap
 	apt-get update -qq
 	apt-get install -y debootstrap
 
-	#Le systeme de Rescue de OVH tourne sur une version ancienne et elle ne connait pas le mot de passe noble de Ubuntu 24.04 car c'est une version trop recente
+	#Le systeme de Rescue de OVH tourne sur une version ancienne et elle ne connait pas le mot de passe noble de Ubuntu 24.04 car c'est une version trop récente
 	#Cette commande crée un simple lien virtuel : quand le script cherchera "noble" il lira "gutsy" et l'installation fonctionnera
 	ln -sf /usr/share/debootstrap/scripts/gutsy /usr/share/debootstrap/scripts/"$UBUNTU_RELEASE"
 
-	#crée le dossier d'instalation (/mnt/ubuntu_install)
+	#crée le dossier d'insallation (/mnt/ubuntu_install)
 	mkdir -p "$TARGET_MOUNT"
 
 	#Attache la partition root de 50GB au dossier $TARGET_MOUNT (/mnt/ubuntu_install)
@@ -87,13 +89,13 @@ run_debootstrap() {
 
 }
 
-#Prépare le nouveau système�rtre lancer
+#Prépare le nouveau systè a �tre lancer
 prepare_chroot() {
 
-        #Copie le resovle.conf de rescue vers le noyaux système 
+        #Copie le resovl.conf de rescue vers le noyau système 
         cp /etc/resolv.conf "$TARGET_MOUNT/etc/resolv.conf"
 
-        #Crée le fichier qui vas dire au nouveau sysème monter automatiquement les partitions a chaque démarrage
+        #Crée le fichier qui v dire au nouveau sysèm de monter automatiquement les partitions a chaque démarrag
         cat <<EOF > "$TARGET_MOUNT/etc/fstab"
 /dev/$VG_NAME/root   /           ext4    defaults        0 1
 $PART_EFI            /boot/efi   vfat    defaults        0 2
@@ -103,14 +105,14 @@ EOF
 
         # /dev : Pour que le nouveau système voie les disques durs physiques
         mount --bind /dev "$TARGET_MOUNT/dev"
-        # /dev/pts : Pour pouvoir interagir avec le terminale
+        # /dev/pts : Pour pouvoir interagir avec le terminal
         mount --bind /dev/pts "$TARGET_MOUNT/dev/pts"
         # /proc : Pour qu'il voie la RAM et le processeur
         mount -t proc proc "$TARGET_MOUNT/proc"
         # /sys : Pour qu'il voie les composants de la carte mère
         mount -t sysfs sysfs "$TARGET_MOUNT/sys"
 
-        #Permet au nouveau systèmede accéder aux paramètres de démarrage la ta cartèr
+        #Permet au nouveau systèmede accéder aux paramètres de démarrag carte mère
         mount --bind /sys/firmware/efi/efivars "$TARGET_MOUNT/sys/firmware/efi/efivars"
 
 
@@ -124,7 +126,7 @@ configure_chroot(){
         #Définit le fuseau horaire sur Paris
         chroot "$TARGET_MOUNT" ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
         
-        #Envoi le mots de passe depuis le rescue vers l'interieure 
+        #Envoie le mots de passe depuis le rescue vers l'interieur 
         echo "root:$ROOT_PASSWORD" | chroot "$TARGET_MOUNT" chpasswd
 
         #Installation des paquets
@@ -134,16 +136,16 @@ configure_chroot(){
 
 
 
-        #Création du dossier netplan pour la configuration éseau 
+        #Création du dossier netplan pour la configurationréseau 
         mkdir -p "$TARGET_MOUNT/etc/netplan"
 
 
 
         #Création et configuration du fichier netcfg.yaml
 
-        #renderer:networkd, Précise d'utiliser systemd-networkd comme moteur de gestion deréseau
-        #match: name: e*, Dis au systeme de choisir n'imorte quelle carte réseau qui commence par un e (eth0, enp0s3, ens3... ) 
-        #dhcp4: true, Demande automatiquement une addresse IP auprès de la box ou du routeur 
+        #renderer:networkd, Précise d'utiliser systemd-networkd comme moteur de gestion u résea
+        #match: name: e*, Dis au systeme de choisir n'importe quelle carte réseau qui commence par un"e" (eth0, enp0s3, ens3... ) 
+        #dhcp4: true, Demande automatiquement une adresse IP auprès de la box ou du router
         cat <<EOF > "$TARGET_MOUNT/etc/netplan/01-netcfg.yaml"
 network:
   version: 2
@@ -157,10 +159,10 @@ EOF
 
 
         
-        #Créatin du dossier .ssh
+        #Créaton du dossier .ssh
         mkdir -p "$TARGET_MOUNT/root/.ssh"
         
-        #Rajout de la clépublique dans le fichier authorized_keys
+        #Rajout de la clé publique dans le fichier authorized_keys
         echo "$SSH_PUBLIC_KEY" > "$TARGET_MOUNT/root/.ssh/authorized_keys"
         
         #Attribution des droits au fichier/dossier 
@@ -169,7 +171,7 @@ EOF
 
 
         #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!TEMPORAIRE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #Autorise le compte root a se connecer en ssh avec son propre mots de passe 
+        #Autorise le compte root a se connecter en ssh avec son propre mots de passe 
         sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' "$TARGET_MOUNT/etc/ssh/sshd_config"
 
 
