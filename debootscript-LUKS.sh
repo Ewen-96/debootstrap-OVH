@@ -145,6 +145,15 @@ configure_chroot(){
         # Envoie le mot de passe depuis le rescue vers l'interieur
         echo "root:$ROOT_PASSWORD" | chroot "$TARGET_MOUNT" chpasswd
 
+        #Ajout des catalogues d'applications pour pouvoir installer  update-initramfs
+        cat <<EOF > "$TARGET_MOUNT/etc/apt/sources.list"
+deb http://archive.ubuntu.com/ubuntu/ $UBUNTU_RELEASE main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu/ $UBUNTU_RELEASE-updates main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu/ $UBUNTU_RELEASE-security main restricted universe multiverse
+EOF
+
+
+
         # Installation des paquets
         # env DEBIAN_FRONTEND=noninteractive empeche les menus de bloquer le script
         chroot "$TARGET_MOUNT" env DEBIAN_FRONTEND=noninteractive apt-get update -qq
