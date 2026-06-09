@@ -20,82 +20,82 @@ SSH_PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFsMgUSJ7k/8gSZ2tbUUGfZjF/At
 #Partitionnement
 prepare_disk_lvm() {
 
-    # Nettoyage
-    wipefs -a "$TARGET_DISK"
-    sgdisk --zap-all "$TARGET_DISK"
-
-    # Cree une partition EFI de 512MB sur $TARGET_DISK:
-    sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$TARGET_DISK"
-    # Cree une seconde partition sur $TARGET_DISK avec toute la place restante
-    sgdisk -n 2:0:0 -t 2:8e00 -c 2:"LVM" "$TARGET_DISK"
-
-    # Informer le kernel des modifications apportees a la table de partitions
-    partprobe "$TARGET_DISK"
-    sleep 3
-
-    # Formater le disque $PART_EFI (nvme0n1p1)
-    mkfs.fat -F32 "$PART_EFI"
-    sleep 3
-
-    # Installer le peripherique de stockage pour qu'il soit reconnu et utilise par LVM
-    pvcreate -y "$PART_LVM"
-
-    # cree un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour etre decoupe en plusieurs volumes virtuels
-    vgcreate -y "$VG_NAME" "$PART_LVM"
-
-    # Decoupe le stockage nouvellement cree en deux parties, une partie de 50GB pour installer le root avec le chiffrement et une autre partie de 8G pour installer le swap
-    lvcreate -y -L 50G -n root_luks "$VG_NAME"	#LUKS
-    lvcreate -y -L 8G -n swap "$VG_NAME"
-
-    # Decoupe en une troisième partie non chiffrée qui contient un Noyau Linux et Dropbear juste pour pouvoir taper le mots de passe LUKS au démarrage du serveur 
-    lvcreate -y -L 2G -n boot "$VG_NAME"        #LUKS
-
-    # Applique le chiffrement(LUKS) sur la partie root_luks de 50GB
-    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat /dev/$VG_NAME/root_luks	#LUKS
-
-    # Deverrouille le volume chiffré et le rend accèssible a l'aide du mot de passe sous le nom de "crypt_root" pour pouvoir y installer le système 
-    echo -n "$LUKS_PASSWORD" | cryptsetup open /dev/$VG_NAME/root_luks crypt_root	#LUKS
-
-
-    # Prepare les deux volumes nouvellement crees a etre utilises en leur appliquant le bon format:
-    # Le format EXT4 pour le root
-    # Le format special swap pour la memoire de secours
-    mkfs.ext4 -F /dev/mapper/crypt_root #LUKS
-    mkfs.ext4 -F /dev/$VG_NAME/boot	#LUKS
-    mkswap /dev/$VG_NAME/swap
+	    # Nettoyage
+	    wipefs -a "$TARGET_DISK"
+	    sgdisk --zap-all "$TARGET_DISK"
+	
+	    # Cree une partition EFI de 512MB sur $TARGET_DISK:
+	    sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$TARGET_DISK"
+	    # Cree une seconde partition sur $TARGET_DISK avec toute la place restante
+	    sgdisk -n 2:0:0 -t 2:8e00 -c 2:"LVM" "$TARGET_DISK"
+	
+	    # Informer le kernel des modifications apportees a la table de partitions
+	    partprobe "$TARGET_DISK"
+	    sleep 3
+	
+	    # Formater le disque $PART_EFI (nvme0n1p1)
+	    mkfs.fat -F32 "$PART_EFI"
+	    sleep 3
+	
+	    # Installer le peripherique de stockage pour qu'il soit reconnu et utilise par LVM
+	    pvcreate -y "$PART_LVM"
+	
+	    # cree un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour etre decoupe en plusieurs volumes virtuels
+	    vgcreate -y "$VG_NAME" "$PART_LVM"
+	
+	    # Decoupe le stockage nouvellement cree en deux parties, une partie de 50GB pour installer le root avec le chiffrement et une autre partie de 8G pour installer le swap
+	    lvcreate -y -L 50G -n root_luks "$VG_NAME"	#LUKS
+	    lvcreate -y -L 8G -n swap "$VG_NAME"
+	
+	    # Decoupe en une troisième partie non chiffrée qui contient un Noyau Linux et Dropbear juste pour pouvoir taper le mots de passe LUKS au démarrage du serveur 
+	    lvcreate -y -L 2G -n boot "$VG_NAME"        #LUKS
+	
+	    # Applique le chiffrement(LUKS) sur la partie root_luks de 50GB
+	    echo -n "$LUKS_PASSWORD" | cryptsetup luksFormat /dev/$VG_NAME/root_luks	#LUKS
+	
+	    # Deverrouille le volume chiffré et le rend accèssible a l'aide du mot de passe sous le nom de "crypt_root" pour pouvoir y installer le système 
+	    echo -n "$LUKS_PASSWORD" | cryptsetup open /dev/$VG_NAME/root_luks crypt_root	#LUKS
+	
+	
+	    # Prepare les deux volumes nouvellement crees a etre utilises en leur appliquant le bon format:
+	    # Le format EXT4 pour le root
+	    # Le format special swap pour la memoire de secours
+	    mkfs.ext4 -F /dev/mapper/crypt_root #LUKS
+	    mkfs.ext4 -F /dev/$VG_NAME/boot	#LUKS
+	    mkswap /dev/$VG_NAME/swap
 }
 
 # Telechargement
 run_debootstrap() {
 
-    # Installation de debootstrap
-    apt-get update -qq
-    apt-get install -y debootstrap
+	    # Installation de debootstrap
+	    apt-get update -qq
+	    apt-get install -y debootstrap
+	
+	    # Le systeme de Rescue de OVH tourne sur une version ancienne et elle ne connait pas le mot de passe noble de Ubuntu 24.04 car c'est une version trop recente
+	    # Cette commande cree un simple lien virtuel : quand le script cherchera "noble" il lira "gutsy" et l'installation fonctionnera
+	    ln -sf /usr/share/debootstrap/scripts/gutsy /usr/share/debootstrap/scripts/"$UBUNTU_RELEASE"
+	
+	    # cree le dossier d'installation (/mnt/ubuntu_install)
+	    mkdir -p "$TARGET_MOUNT"
+	
+	    # Attache la partition crypt_root de 50GB au dossier $TARGET_MOUNT (/mnt/ubuntu_install)
+	    mount /dev/mapper/crypt_root "$TARGET_MOUNT"	#LUKS
+	
+	    # cree le dossier /boot dans le dossier d'installation et attache la partition de demarrage temporaire (juste pour taper le mots de passe LUKS au démarrage)
+	    mkdir -p "$TARGET_MOUNT/boot"			#LUKS
+	    mount /dev/$VG_NAME/boot "$TARGET_MOUNT/boot"	#LUKS
+	   
+	
+	    # cree le dossier /boot/efi dans le dossier d'installation et attache la partition de demarrage $PART_EFI (nvme0n1)
+	    mkdir -p "$TARGET_MOUNT/boot/efi"
+	    mount "$PART_EFI" "$TARGET_MOUNT/boot/efi"
 
-    # Le systeme de Rescue de OVH tourne sur une version ancienne et elle ne connait pas le mot de passe noble de Ubuntu 24.04 car c'est une version trop recente
-    # Cette commande cree un simple lien virtuel : quand le script cherchera "noble" il lira "gutsy" et l'installation fonctionnera
-    ln -sf /usr/share/debootstrap/scripts/gutsy /usr/share/debootstrap/scripts/"$UBUNTU_RELEASE"
+    	# Allume et rend utilisable le swap
+    	swapon /dev/$VG_NAME/swap
 
-    # cree le dossier d'installation (/mnt/ubuntu_install)
-    mkdir -p "$TARGET_MOUNT"
-
-    # Attache la partition crypt_root de 50GB au dossier $TARGET_MOUNT (/mnt/ubuntu_install)
-    mount /dev/mapper/crypt_root "$TARGET_MOUNT"	#LUKS
-
-    # cree le dossier /boot dans le dossier d'installation et attache la partition de demarrage temporaire (juste pour taper le mots de passe LUKS au démarrage)
-    mkdir -p "$TARGET_MOUNT/boot"			#LUKS
-    mount /dev/$VG_NAME/boot "$TARGET_MOUNT/boot"	#LUKS
-   
-
-    # cree le dossier /boot/efi dans le dossier d'installation et attache la partition de demarrage $PART_EFI (nvme0n1)
-    mkdir -p "$TARGET_MOUNT/boot/efi"
-    mount "$PART_EFI" "$TARGET_MOUNT/boot/efi"
-
-    # Allume et rend utilisable le swap
-    swapon /dev/$VG_NAME/swap
-
-    # Telechargement de ubuntu depuis les depots officiels
-    debootstrap --arch=amd64 "$UBUNTU_RELEASE" "$TARGET_MOUNT" http://archive.ubuntu.com/ubuntu/
+    	# Telechargement de ubuntu depuis les depots officiels
+    	debootstrap --arch=amd64 "$UBUNTU_RELEASE" "$TARGET_MOUNT" http://archive.ubuntu.com/ubuntu/
 }
 
 # Prepare le nouveau systeme a etre lance
@@ -113,12 +113,12 @@ $PART_EFI            	/boot/efi   vfat    defaults        0 2
 EOF
 
 
-	#chercher le "numéro de série" (UUID) de la partition root_luks
-	LUKS_UUID=$(blkid -s UUID -o value /dev/$VG_NAME/root_luks)	#LUKS
+		#chercher le "numéro de série" (UUID) de la partition root_luks
+		LUKS_UUID=$(blkid -s UUID -o value /dev/$VG_NAME/root_luks)	#LUKS
 	
-	#écrit dans le fichier crypttab : Ouvre le disque avec l'UUID et renomme le crypt_root
-	#pour qu'il demande le mot de passe à chaque démarrage de l'ordinateur
-	echo "crypt_root UUID=$LUKS_UUID none luks" > "$TARGET_MOUNT/etc/crypttab"	#LUKS
+		#écrit dans le fichier crypttab : Ouvre le disque avec l'UUID et renomme le crypt_root
+		#pour qu'il demande le mot de passe à chaque démarrage de l'ordinateur
+		echo "crypt_root UUID=$LUKS_UUID none luks" > "$TARGET_MOUNT/etc/crypttab"	#LUKS
 
 
         # /dev : Pour que le nouveau système voie les disques durs physiques
@@ -180,7 +180,7 @@ EOF
 
 
 
-	#Crée un petit serveur ssh léger(Dropbear) temporaire au démarrage du serveur pour pouvoir taper le mot de passe LUKS 
+		#Crée un petit serveur ssh léger(Dropbear) temporaire au démarrage du serveur pour pouvoir taper le mot de passe LUKS 
         mkdir -p "$TARGET_MOUNT/etc/dropbear/initramfs"	#LUKS
         echo "$SSH_PUBLIC_KEY" > "$TARGET_MOUNT/etc/dropbear/initramfs/authorized_keys"	#LUKS
         chmod 600 "$TARGET_MOUNT/etc/dropbear/initramfs/authorized_keys"	#LUKS
@@ -191,8 +191,8 @@ EOF
         #Allumer la carte réseau en DHCP dès le démarrage
         echo "IP=dhcp" >> "$TARGET_MOUNT/etc/initramfs-tools/initramfs.conf"	#LUKS
 	
-	#Met a jour le noyau Linux temporaire pour y inclure l'outil de déchiffrement LUKS pour que la machine puisse demander le mots de passe au démarrage
-	chroot "$TARGET_MOUNT" update-initramfs -u -k all	#LUKS
+		#Met a jour le noyau Linux temporaire pour y inclure l'outil de déchiffrement LUKS pour que la machine puisse demander le mots de passe au démarrage
+		chroot "$TARGET_MOUNT" update-initramfs -u -k all	#LUKS
 
 
         # Installation de GRUB
@@ -203,8 +203,8 @@ EOF
         umount -R "$TARGET_MOUNT"
         swapoff -a
 	
-	#Verrouille le volume chiffré et le rend inaccessible 
-	cryptsetup close crypt_root || true #LUKS
+		#Verrouille le volume chiffré et le rend inaccessible 
+		cryptsetup close crypt_root || true #LUKS
 
 
 }
