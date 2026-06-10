@@ -12,7 +12,7 @@ PART_EFI="${TARGET_DISK}p1"
 PART_LVM="${TARGET_DISK}p2"
 
 TARGET_DISK2="/dev/nvme1n1"
-PART_LVM2="${TARGET_DISK2}p2"
+PART_LVM2="${TARGET_DISK2}p1"
 
 VG_NAME="vg_system"
 TARGET_MOUNT="/mnt/ubuntu_install"
@@ -49,7 +49,7 @@ prepare_disk_lvm() {
 	pvcreate -y "$PART_LVM" "$PART_LVM2"
 	
 	# cree un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour etre decoupe en plusieurs volumes virtuels
-	vgcreate -y "$VG_NAME" "$PART_LVM" "$PART_EFI2"
+	vgcreate -y "$VG_NAME" "$PART_LVM" "$PART_LVM2"
 	
 	# Decoupe le stockage nouvellement cree en deux parties, une partie de 50GB pour installer le root avec le chiffrement et une autre partie de 8G pour installer le swap
 	lvcreate -y -L 4T -n root_luks "$VG_NAME"	#LUKS
