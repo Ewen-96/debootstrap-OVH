@@ -12,7 +12,6 @@ PART_EFI="${TARGET_DISK}p1"
 PART_LVM="${TARGET_DISK}p2"
 
 TARGET_DISK2="/dev/nvme1n1"
-PART_EFI2="${TARGET_DISK2}p1"
 PART_LVM2="${TARGET_DISK2}p2"
 
 VG_NAME="vg_system"
@@ -26,7 +25,10 @@ prepare_disk_lvm() {
 	
 	# Nettoyage
 	wipefs -a "$TARGET_DISK"
-	sgdisk --zap-all "$TARGET_DISK"
+    sgdisk --zap-all "$TARGET_DISK"
+    wipefs -a "$TARGET_DISK2"
+    sgdisk --zap-all "$TARGET_DISK2"
+	
 	# Cree une partition EFI de 512MB sur $TARGET_DISK:
 	sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$TARGET_DISK"
 	# Cree une seconde partition sur $TARGET_DISK avec toute la place restante
@@ -41,14 +43,13 @@ prepare_disk_lvm() {
 	
 	# Formater le disque $PART_EFI (nvme0n1p1)
 	mkfs.fat -F32 "$PART_EFI"
-	mkfs.fat -F32 "$PART_EFI2"
 	sleep 3
 	
 	# Installer le peripherique de stockage pour qu'il soit reconnu et utilise par LVM
-	pvcreate -y "$PART_LVM" "$PART_EFI2"
+	pvcreate -y "$PART_LVM" "$PART_LVM2"
 	
 	# cree un stockage a partir de la partition $PART_LVM (nvme0n1p2) pour etre decoupe en plusieurs volumes virtuels
-	vgcreate -y vg_system "$PART_LVM" "$PART_EFI2"
+	vgcreate -y "$VG_NAME" "$PART_LVM" "$PART_EFI2"
 	
 	# Decoupe le stockage nouvellement cree en deux parties, une partie de 50GB pour installer le root avec le chiffrement et une autre partie de 8G pour installer le swap
 	lvcreate -y -L 4T -n root_luks "$VG_NAME"	#LUKS
