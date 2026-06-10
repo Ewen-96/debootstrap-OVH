@@ -33,7 +33,7 @@ prepare_disk_lvm() {
 	sgdisk -n 1:0:+512M -t 1:ef00 -c 1:"EFI" "$TARGET_DISK"
 	# Cree une seconde partition sur $TARGET_DISK avec toute la place restante
 	sgdisk -n 2:0:0 -t 2:8e00 -c 2:"LVM" "$TARGET_DISK"
-	
+	#Cree une partition sur le deuxième disk 
 	sgdisk -n 1:0:0 -t 1:8e00 -c 1:"LVM" "$TARGET_DISK2"
 
 	# Informer le kernel des modifications apportees a la table de partitions
